@@ -347,6 +347,7 @@ func (s *remoteSealer) loop() {
 //   result[3], hex encoded block number
 func (s *remoteSealer) makeWork(block *types.Block) {
 
+	var err error
 	// hash is a hash of block header without extraData
 	hash := s.ethash.SealHashNoExtra(block.Header())
 	s.currentWork[0] = hash.Hex()
@@ -367,14 +368,14 @@ func (s *remoteSealer) makeWork(block *types.Block) {
 		s.currentWork[10] = ""
 	}
 
-	s.currentWork[11] = block.Header().Difficulty.String() // decode use SetString
-	s.currentWork[12] = block.Header().Number.String()
+	s.currentWork[11] = "0x" + block.Header().Difficulty.Text(16)
+	s.currentWork[12] = "0x" + block.Header().Number.Text(16)
 	s.currentWork[13] = fmt.Sprintf("%x", block.Header().GasLimit)
 	s.currentWork[14] = fmt.Sprintf("%x", block.Header().GasUsed)
 	s.currentWork[15] = fmt.Sprintf("%x", block.Header().Time)
 
 	if block.Header().BaseFee != nil {
-		s.currentWork[16] = block.Header().BaseFee.String()
+		s.currentWork[16] = "0x" + block.Header().BaseFee.Text(16)
 	} else {
 		s.currentWork[16] = ""
 	}
