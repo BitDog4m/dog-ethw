@@ -347,7 +347,7 @@ func (s *remoteSealer) loop() {
 //   result[3], hex encoded block number
 func (s *remoteSealer) makeWork(block *types.Block) {
 
-	var err error
+	//var err error
 	// hash is a hash of block header without extraData
 	hash := s.ethash.SealHashNoExtra(block.Header())
 	s.currentWork[0] = hash.Hex()
