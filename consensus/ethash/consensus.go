@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"math/big"
 	"runtime"
 	"time"
@@ -549,7 +550,17 @@ func (ethash *Ethash) verifySeal(chain consensus.ChainHeaderReader, header *type
 	if fulldag {
 		dataset := ethash.dataset(number, true)
 		if dataset.generated() {
-			digest, result = hashimotoFull(dataset.dataset, ethash.SealHash(header).Bytes(), header.Nonce.Uint64())
+
+			powHash := ethash.SealHash(header)
+
+			digest, result = hashimotoFull(dataset.dataset, powHash.Bytes(), header.Nonce.Uint64())
+
+			ethash.config.Log.Trace("verify submit work",
+				"powHash", powHash.Hex(),
+				"nonce", header.Nonce.Uint64(),
+				"digest", header.MixDigest.Hex(),
+				"digestResult", hexutil.Encode(digest),
+				"target", hexutil.Encode(result))
 
 			// Datasets are unmapped in a finalizer. Ensure that the dataset stays alive
 			// until after the call to hashimotoFull so it's not unmapped while being used.

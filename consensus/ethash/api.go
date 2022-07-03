@@ -18,6 +18,7 @@ package ethash
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -69,9 +70,19 @@ func (api *API) SubmitWork(nonce types.BlockNonce, hash, digest common.Hash, ext
 	}
 
 	var extraBytes []byte
-	if extra != "" {
-		extraBytes, _ = hexutil.Decode(extra)
+	if extra == "" || !strings.HasPrefix(extra, "0x") {
+		api.ethash.config.Log.Error("bad params for extra, want 0x prefix")
+		return false
+	} else {
+		eb, err := hexutil.Decode(extra)
+
+		if err != nil {
+			api.ethash.config.Log.Error("decode extraData error: " + err.Error())
+			return false
+		}
+		extraBytes = eb
 	}
+
 	var errc = make(chan error, 1)
 	select {
 	case api.ethash.remote.submitWorkCh <- &mineResult{
