@@ -370,9 +370,9 @@ func (s *remoteSealer) makeWork(block *types.Block) {
 
 	s.currentWork[11] = "0x" + block.Header().Difficulty.Text(16)
 	s.currentWork[12] = "0x" + block.Header().Number.Text(16)
-	s.currentWork[13] = fmt.Sprintf("%x", block.Header().GasLimit)
-	s.currentWork[14] = fmt.Sprintf("%x", block.Header().GasUsed)
-	s.currentWork[15] = fmt.Sprintf("%x", block.Header().Time)
+	s.currentWork[13] = fmt.Sprintf("0x%x", block.Header().GasLimit)
+	s.currentWork[14] = fmt.Sprintf("0x%x", block.Header().GasUsed)
+	s.currentWork[15] = fmt.Sprintf("0x%x", block.Header().Time)
 
 	if block.Header().BaseFee != nil {
 		s.currentWork[16] = "0x" + block.Header().BaseFee.Text(16)
