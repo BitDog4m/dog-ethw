@@ -555,7 +555,7 @@ func (ethash *Ethash) verifySeal(chain consensus.ChainHeaderReader, header *type
 
 			digest, result = hashimotoFull(dataset.dataset, powHash.Bytes(), header.Nonce.Uint64())
 
-			ethash.config.Log.Trace("verify submit work",
+			ethash.config.Log.Info("verify submit work",
 				"powHash", powHash.Hex(),
 				"nonce", header.Nonce.Uint64(),
 				"digest", header.MixDigest.Hex(),
