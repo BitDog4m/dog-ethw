@@ -110,6 +110,9 @@ type Engine interface {
 	// SealHash returns the hash of a block prior to it being sealed.
 	SealHash(header *types.Header) common.Hash
 
+	// SealHashNoExta returns the hash of a block (not included extradata) prior to it being sealed.
+	SealHashNoExtra(header *types.Header) common.Hash
+
 	// CalcDifficulty is the difficulty adjustment algorithm. It returns the difficulty
 	// that a new block should have.
 	CalcDifficulty(chain ChainHeaderReader, time uint64, parent *types.Header) *big.Int

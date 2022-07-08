@@ -310,6 +310,11 @@ func (beacon *Beacon) SealHash(header *types.Header) common.Hash {
 	return beacon.ethone.SealHash(header)
 }
 
+// SealHashNoExtra returns the hash of a block prior to it being sealed.
+func (beacon *Beacon) SealHashNoExtra(header *types.Header) common.Hash {
+	return beacon.ethone.SealHashNoExtra(header)
+}
+
 // CalcDifficulty is the difficulty adjustment algorithm. It returns
 // the difficulty that a new block should have when created at time
 // given the parent block's time and difficulty.

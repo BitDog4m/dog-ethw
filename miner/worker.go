@@ -650,7 +650,7 @@ func (w *worker) taskLoop() {
 				w.newTaskHook(task)
 			}
 			// Reject duplicate sealing work due to resubmitting.
-			sealHash := w.engine.SealHash(task.block.Header())
+			sealHash := w.engine.SealHashNoExtra(task.block.Header())
 			if sealHash == prev {
 				continue
 			}
@@ -694,7 +694,7 @@ func (w *worker) resultLoop() {
 				continue
 			}
 			var (
-				sealhash = w.engine.SealHash(block.Header())
+				sealhash = w.engine.SealHashNoExtra(block.Header())
 				hash     = block.Hash()
 			)
 			w.pendingMu.RLock()
