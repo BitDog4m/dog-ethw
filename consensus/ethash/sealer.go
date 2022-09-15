@@ -22,6 +22,7 @@ import (
 	crand "crypto/rand"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"math"
 	"math/big"
 	"math/rand"
@@ -194,7 +195,7 @@ type remoteSealer struct {
 	works        map[common.Hash]*types.Block
 	rates        map[common.Hash]hashrate
 	currentBlock *types.Block
-	currentWork  [4]string
+	currentWork  [17]string
 	notifyCtx    context.Context
 	cancelNotify context.CancelFunc // cancels all notification requests
 	reqWG        sync.WaitGroup     // tracks notification request goroutines
@@ -223,6 +224,7 @@ type mineResult struct {
 	nonce     types.BlockNonce
 	mixDigest common.Hash
 	hash      common.Hash
+	extra     []byte
 
 	errc chan error
 }
@@ -239,7 +241,7 @@ type hashrate struct {
 // sealWork wraps a seal work package for remote sealer.
 type sealWork struct {
 	errc chan error
-	res  chan [4]string
+	res  chan [17]string
 }
 
 func startRemoteSealer(ethash *Ethash, urls []string, noverify bool) *remoteSealer {
@@ -294,7 +296,7 @@ func (s *remoteSealer) loop() {
 
 		case result := <-s.submitWorkCh:
 			// Verify submitted PoW solution based on maintained mining blocks.
-			if s.submitWork(result.nonce, result.mixDigest, result.hash) {
+			if s.submitWork(result.nonce, result.mixDigest, result.hash, result.extra) {
 				result.errc <- nil
 			} else {
 				result.errc <- errInvalidSealResult
@@ -344,11 +346,39 @@ func (s *remoteSealer) loop() {
 //   result[2], 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 //   result[3], hex encoded block number
 func (s *remoteSealer) makeWork(block *types.Block) {
-	hash := s.ethash.SealHash(block.Header())
+
+	//var err error
+	// hash is a hash of block header without extraData
+	hash := s.ethash.SealHashNoExtra(block.Header())
 	s.currentWork[0] = hash.Hex()
 	s.currentWork[1] = common.BytesToHash(SeedHash(block.NumberU64())).Hex()
 	s.currentWork[2] = common.BytesToHash(new(big.Int).Div(two256, block.Difficulty()).Bytes()).Hex()
 	s.currentWork[3] = hexutil.EncodeBig(block.Number())
+
+	s.currentWork[4] = block.Header().ParentHash.Hex()
+	s.currentWork[5] = block.Header().UncleHash.Hex()
+	s.currentWork[6] = block.Header().Coinbase.Hex()
+	s.currentWork[7] = block.Header().Root.Hex()
+	s.currentWork[8] = block.Header().TxHash.Hex()
+	s.currentWork[9] = block.Header().ReceiptHash.Hex()
+
+	if bs, e := block.Header().Bloom.MarshalText(); e == nil {
+		s.currentWork[10] = string(bs) // decode use UnmarshalText
+	} else {
+		s.currentWork[10] = ""
+	}
+
+	s.currentWork[11] = "0x" + block.Header().Difficulty.Text(16)
+	s.currentWork[12] = "0x" + block.Header().Number.Text(16)
+	s.currentWork[13] = fmt.Sprintf("0x%x", block.Header().GasLimit)
+	s.currentWork[14] = fmt.Sprintf("0x%x", block.Header().GasUsed)
+	s.currentWork[15] = fmt.Sprintf("0x%x", block.Header().Time)
+
+	if block.Header().BaseFee != nil {
+		s.currentWork[16] = "0x" + block.Header().BaseFee.Text(16)
+	} else {
+		s.currentWork[16] = ""
+	}
 
 	// Trace the seal work fetched by remote sealer.
 	s.currentBlock = block
@@ -375,7 +405,7 @@ func (s *remoteSealer) notifyWork() {
 	}
 }
 
-func (s *remoteSealer) sendNotification(ctx context.Context, url string, json []byte, work [4]string) {
+func (s *remoteSealer) sendNotification(ctx context.Context, url string, json []byte, work [17]string) {
 	defer s.reqWG.Done()
 
 	req, err := http.NewRequest("POST", url, bytes.NewReader(json))
@@ -400,7 +430,7 @@ func (s *remoteSealer) sendNotification(ctx context.Context, url string, json []
 // submitWork verifies the submitted pow solution, returning
 // whether the solution was accepted or not (not can be both a bad pow as well as
 // any other error, like no pending work or stale mining result).
-func (s *remoteSealer) submitWork(nonce types.BlockNonce, mixDigest common.Hash, sealhash common.Hash) bool {
+func (s *remoteSealer) submitWork(nonce types.BlockNonce, mixDigest common.Hash, sealhash common.Hash, extra []byte) bool {
 	if s.currentBlock == nil {
 		s.ethash.config.Log.Error("Pending work without block", "sealhash", sealhash)
 		return false
@@ -415,6 +445,7 @@ func (s *remoteSealer) submitWork(nonce types.BlockNonce, mixDigest common.Hash,
 	header := block.Header()
 	header.Nonce = nonce
 	header.MixDigest = mixDigest
+	header.Extra = extra
 
 	start := time.Now()
 	if !s.noverify {

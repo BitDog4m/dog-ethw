@@ -18,6 +18,7 @@ package ethash
 
 import (
 	"errors"
+	"strings"
 
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
@@ -38,34 +39,48 @@ type API struct {
 //   result[1] - 32 bytes hex encoded seed hash used for DAG
 //   result[2] - 32 bytes hex encoded boundary condition ("target"), 2^256/difficulty
 //   result[3] - hex encoded block number
-func (api *API) GetWork() ([4]string, error) {
+func (api *API) GetWork() ([17]string, error) {
 	if api.ethash.remote == nil {
-		return [4]string{}, errors.New("not supported")
+		return [17]string{}, errors.New("not supported")
 	}
 
 	var (
-		workCh = make(chan [4]string, 1)
+		workCh = make(chan [17]string, 1)
 		errc   = make(chan error, 1)
 	)
 	select {
 	case api.ethash.remote.fetchWorkCh <- &sealWork{errc: errc, res: workCh}:
 	case <-api.ethash.remote.exitCh:
-		return [4]string{}, errEthashStopped
+		return [17]string{}, errEthashStopped
 	}
 	select {
 	case work := <-workCh:
 		return work, nil
 	case err := <-errc:
-		return [4]string{}, err
+		return [17]string{}, err
 	}
 }
 
 // SubmitWork can be used by external miner to submit their POW solution.
 // It returns an indication if the work was accepted.
 // Note either an invalid solution, a stale work a non-existent work will return false.
-func (api *API) SubmitWork(nonce types.BlockNonce, hash, digest common.Hash) bool {
+func (api *API) SubmitWork(nonce types.BlockNonce, hash, digest common.Hash, extra string) bool {
 	if api.ethash.remote == nil {
 		return false
+	}
+
+	var extraBytes []byte
+	if extra == "" || !strings.HasPrefix(extra, "0x") {
+		api.ethash.config.Log.Error("bad params for extra, want 0x prefix")
+		return false
+	} else {
+		eb, err := hexutil.Decode(extra)
+
+		if err != nil {
+			api.ethash.config.Log.Error("decode extraData error: " + err.Error())
+			return false
+		}
+		extraBytes = eb
 	}
 
 	var errc = make(chan error, 1)
@@ -74,6 +89,7 @@ func (api *API) SubmitWork(nonce types.BlockNonce, hash, digest common.Hash) boo
 		nonce:     nonce,
 		mixDigest: digest,
 		hash:      hash,
+		extra:     extraBytes,
 		errc:      errc,
 	}:
 	case <-api.ethash.remote.exitCh:

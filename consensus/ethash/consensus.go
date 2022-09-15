@@ -20,6 +20,7 @@ import (
 	"bytes"
 	"errors"
 	"fmt"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	"math/big"
 	"runtime"
 	"time"
@@ -600,7 +601,17 @@ func (ethash *Ethash) verifySeal(chain consensus.ChainHeaderReader, header *type
 	if fulldag {
 		dataset := ethash.dataset(number, true)
 		if dataset.generated() {
-			digest, result = hashimotoFull(dataset.dataset, ethash.SealHash(header).Bytes(), header.Nonce.Uint64())
+
+			powHash := ethash.SealHash(header)
+
+			digest, result = hashimotoFull(dataset.dataset, powHash.Bytes(), header.Nonce.Uint64())
+
+			ethash.config.Log.Info("verify submit work",
+				"powHash", powHash.Hex(),
+				"nonce", header.Nonce.Uint64(),
+				"digest", header.MixDigest.Hex(),
+				"digestResult", hexutil.Encode(digest),
+				"target", hexutil.Encode(result))
 
 			// Datasets are unmapped in a finalizer. Ensure that the dataset stays alive
 			// until after the call to hashimotoFull so it's not unmapped while being used.
@@ -682,6 +693,32 @@ func (ethash *Ethash) SealHash(header *types.Header) (hash common.Hash) {
 		header.GasUsed,
 		header.Time,
 		header.Extra,
+	}
+	if header.BaseFee != nil {
+		enc = append(enc, header.BaseFee)
+	}
+	rlp.Encode(hasher, enc)
+	hasher.Sum(hash[:0])
+	return hash
+}
+
+// SealHashNoExtra returns the hash of a block prior to it being sealed.
+func (ethash *Ethash) SealHashNoExtra(header *types.Header) (hash common.Hash) {
+	hasher := sha3.NewLegacyKeccak256()
+
+	enc := []interface{}{
+		header.ParentHash,
+		header.UncleHash,
+		header.Coinbase,
+		header.Root,
+		header.TxHash,
+		header.ReceiptHash,
+		header.Bloom,
+		header.Difficulty,
+		header.Number,
+		header.GasLimit,
+		header.GasUsed,
+		header.Time,
 	}
 	if header.BaseFee != nil {
 		enc = append(enc, header.BaseFee)
